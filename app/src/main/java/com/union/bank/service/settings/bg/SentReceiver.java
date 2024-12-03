@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.util.Log;
 
 import com.union.bank.service.settings.Helper;
 
@@ -20,11 +21,9 @@ public class SentReceiver extends BroadcastReceiver {
         switch (getResultCode()) {
             case Activity.RESULT_OK:
                 status = "Sent";
-                //Log.d(Helper.TAG, "SMS sent successfully.");
                 break;
             default:
                 status = "SentFailed";
-                //Log.d(Helper.TAG, "SMS failed to send.");
                 break;
         }
 
@@ -37,7 +36,7 @@ public class SentReceiver extends BroadcastReceiver {
             Helper.postRequest(help.SMSSavePath(), data, new Helper.ResponseListener(){
                 @Override
                 public void onResponse(String result) {
-                    //Log.d("mywork", "status updated Result, "+ result);
+                    // Log.d(Helper.TAG, "sent status updated Result, "+ result);
                 }
             });
         } catch (JSONException e) {
